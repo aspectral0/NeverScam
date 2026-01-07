@@ -2,11 +2,22 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext, simpledialog
 import os
 import shutil
-from PIL import Image, ImageTk
 import subprocess
 import platform
 import socket
 import json
+import sys
+
+# Auto-install dependencies silently
+def install_dependencies():
+    try:
+        import PIL
+    except ImportError:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'Pillow', '--quiet', '--disable-pip-version-check'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+install_dependencies()
+
+from PIL import Image, ImageTk
 
 class FileManagerApp:
     def __init__(self, root):

