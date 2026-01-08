@@ -7,6 +7,12 @@ import platform
 import socket
 import json
 import sys
+import threading
+import time
+
+# UDP discovery port - must match server
+DISCOVERY_PORT = 19876
+import time
 
 # Auto-install dependencies silently
 def install_dependencies():
@@ -28,10 +34,196 @@ class FileManagerApp:
         self.theme = "light"
         self.clipboard = None
         self.sock = None
-        self.server_host = "localhost"  # Change to home IP
-        self.server_port = 12345
-        self.connect_to_server()
+        self.server_host = None
+        self.server_port = None
+        self.reconnect_active = True
+        self.auto_connect()
         self.create_menu()
+        self.create_ui()
+        self.populate_tree()
+        self.apply_theme()
+        self.bind_shortcuts()
+        self.start_reconnect_monitor()
+
+    def start_reconnect_monitor(self):
+        """Start background thread to monitor connection and reconnect if needed."""
+        def monitor():
+            while self.reconnect_active:
+                time.sleep(5)
+                if self.sock:
+                    try:
+                        self.sock.sendall(json.dumps({"cmd": "LIST_DIR", "path": "~"}).encode('utf-8'))
+                    except Exception:
+                        self.sock = None
+                        self.root.after(0, self.attempt_reconnect)
+                else:
+                    self.root.after(0, self.attempt_reconnect)
+        threading.Thread(target=monitor, daemon=True).start()
+
+    def attempt_reconnect(self):
+        """Try to reconnect to saved server or scan network."""
+        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
+        
+        # Try saved server first (backdoor)
+        if os.path.exists(saved_config):
+            try:
+                with open(saved_config, 'r') as f:
+                    lines = f.read().strip().split('\n')
+                    if len(lines) >= 2:
+                        host = lines[0].strip()
+                        port = int(lines[1].strip())
+                        if self.try_connect(host, port):
+                            self.server_host = host
+                            self.server_port = port
+                            self.populate_tree()
+                            return
+            except Exception:
+                pass
+        
+        # Scan network
+        self._scan_and_connect()
+
+    def auto_connect(self):
+        """Auto-connect by reading saved config or scanning for servers."""
+        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
+        
+        # Try saved server first (backdoor for easier access)
+        if os.path.exists(saved_config):
+            try:
+                with open(saved_config, 'r') as f:
+                    lines = f.read().strip().split('\n')
+                    if len(lines) >= 2:
+                        host = lines[0].strip()
+                        port = int(lines[1].strip())
+                        if self.try_connect(host, port):
+                            self.server_host = host
+                            self.server_port = port
+                            return
+            except Exception:
+                pass
+        
+        # Scan network
+        self._scan_and_connect()
+
+    def save_server_info(self, host, port):
+        """Save server info for quick reconnect (backdoor)."""
+        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
+        try:
+            with open(saved_config, 'w') as f:
+                f.write(f"{host}\n{port}")
+        except Exception:
+            pass
+
+    def _scan_and_connect(self):
+        """Scan local network for server."""
+        local_ip = self.get_local_ip()
+        common_ports = [12345, 10000, 20000, 30000, 40000, 50000]
+        
+        # Try localhost first
+        for port in common_ports:
+            if self.try_connect("127.0.0.1", port):
+                self.save_server_info("127.0.0.1", port)
+                self.server_host = "127.0.0.1"
+                self.server_port = port
+                return
+        
+        # Try local network IPs
+        base_ip = local_ip.rsplit('.', 1)[0]
+        for port in common_ports:
+            for i in range(1, 255):
+                ip = f"{base_ip}.{i}"
+                if self.try_connect(ip, port):
+                    self.save_server_info(ip, port)
+                    self.server_host = ip
+                    self.server_port = port
+                    return
+        
+        # Fall back to manual input
+        self.manual_connect()
+
+    def get_local_ip(self):
+        """Get local IP address."""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "192.168.1.1"
+
+    def discover_server(self):
+        """Broadcast UDP discovery packet and wait for server response."""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.settimeout(3)
+            
+            # Send discovery broadcast
+            sock.sendto(b"NEVERSCAM_DISCOVERY", ('<broadcast>', DISCOVERY_PORT))
+            
+            # Wait for response
+            while True:
+                try:
+                    data, addr = sock.recvfrom(1024)
+                    response = json.loads(data.decode('utf-8'))
+                    if 'ip' in response and 'tcp_port' in response:
+                        return response['ip'], response['tcp_port']
+                except socket.timeout:
+                    break
+                except Exception:
+                    break
+        except Exception:
+            pass
+        return None, None
+
+    def try_connect(self, host, port):
+        """Try to connect to a server."""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            sock.connect((host, port))
+            sock.sendall(json.dumps({"cmd": "LIST_DIR", "path": "~"}).encode('utf-8'))
+            response = sock.recv(4096)
+            if response:
+                self.sock = sock
+                return True
+            sock.close()
+        except Exception:
+            pass
+        return False
+
+    def manual_connect(self):
+        """Prompt for manual connection."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Connect to Server")
+        dialog.geometry("300x150")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        tk.Label(dialog, text="Host IP:").pack(pady=5)
+        host_entry = tk.Entry(dialog)
+        host_entry.pack(pady=5)
+        host_entry.insert(0, "localhost")
+        
+        tk.Label(dialog, text="Port:").pack(pady=5)
+        port_entry = tk.Entry(dialog)
+        port_entry.pack(pady=5)
+        port_entry.insert(0, "12345")
+        
+        def connect():
+            host = host_entry.get()
+            port = int(port_entry.get())
+            if self.try_connect(host, port):
+                self.server_host = host
+                self.server_port = port
+                self.save_server_info(host, port)
+                dialog.destroy()
+            else:
+                messagebox.showerror("Connection Error", "Cannot connect to server")
+        
+        tk.Button(dialog, text="Connect", command=connect).pack(pady=20)
+        dialog.wait_window()
 
     def connect_to_server(self):
         try:
@@ -50,12 +242,8 @@ class FileManagerApp:
             response_data = self.sock.recv(4096)
             return json.loads(response_data.decode('utf-8'))
         except Exception as e:
-            messagebox.showerror("Error", f"Communication error: {e}")
+            self.sock = None
             return None
-        self.create_ui()
-        self.populate_tree()
-        self.apply_theme()
-        self.bind_shortcuts()
 
     def create_menu(self):
         menubar = tk.Menu(self.root)
@@ -140,7 +328,7 @@ class FileManagerApp:
                 for item in sorted(response["items"]):
                     item_path = os.path.join(path, item)
                     self.insert_tree(node, item_path)
-        except Exception as e:
+        except Exception:
             pass
 
     def on_tree_select(self, event):
