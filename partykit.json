@@ -1,0 +1,6 @@
+{
+  "name": "neverscam-relay",
+  "main": "partykit-relay.js",
+  "compatibilityDate": "2025-01-01"
+}
+

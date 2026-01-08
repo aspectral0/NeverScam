@@ -9,12 +9,12 @@
 - [x] Build client as .exe using PyInstaller (requires Windows environment)
 - [x] Create one-click auto-install for host setup
   - [x] auto-install.bat - Batch script for quick installation
-  - [x] install.py - Python installer script
-  - [x] Update README with one-click setup instructions
-- [x] Auto-detect port - Server finds available port automatically (starts from 10000)
-- [x] Auto-detect IP - Server gets local IP address automatically
-- [x] Auto-connect client - Client scans for server on local network
-- [x] Silent operation - No console messages or windows shown
-- [x] Auto-reconnect - Client automatically reconnects if connection is lost
-- [x] Backdoor - Client saves server info for faster reconnection
-- [x] Connection monitor - Background thread checks connection every 5 seconds
+  - [x] silent-install.py - Python installer script (compilable to .exe)
+  - [x] build-installer.bat - Build script for single-file .exe
+- [x] Add PartyKit relay support for remote access without port forwarding
+  - [x] partykit-relay.js - WebSocket relay server for PartyKit
+  - [x] partykit.json - PartyKit configuration
+  - [x] PARTYKIT_GUIDE.md - Detailed deployment instructions
+  - [x] Update silent-install.py with PartyKit relay support
+  - [x] Update README with PartyKit setup instructions
+

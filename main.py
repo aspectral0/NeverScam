@@ -115,28 +115,31 @@ class FileManagerApp:
             pass
 
     def _scan_and_connect(self):
-        """Scan local network for server."""
-        local_ip = self.get_local_ip()
-        common_ports = [12345, 10000, 20000, 30000, 40000, 50000]
-        
-        # Try localhost first
-        for port in common_ports:
-            if self.try_connect("127.0.0.1", port):
-                self.save_server_info("127.0.0.1", port)
-                self.server_host = "127.0.0.1"
-                self.server_port = port
+        """Scan local network for server using UDP discovery first."""
+        # Try UDP discovery first - instant server discovery
+        server_ip, server_port = self.discover_server()
+        if server_ip and server_port:
+            if self.try_connect(server_ip, server_port):
+                self.save_server_info(server_ip, server_port)
+                self.server_host = server_ip
+                self.server_port = server_port
                 return
         
-        # Try local network IPs
-        base_ip = local_ip.rsplit('.', 1)[0]
-        for port in common_ports:
-            for i in range(1, 255):
-                ip = f"{base_ip}.{i}"
-                if self.try_connect(ip, port):
-                    self.save_server_info(ip, port)
-                    self.server_host = ip
-                    self.server_port = port
-                    return
+        # Fall back to saved config or manual input
+        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
+        if os.path.exists(saved_config):
+            try:
+                with open(saved_config, 'r') as f:
+                    lines = f.read().strip().split('\n')
+                    if len(lines) >= 2:
+                        host = lines[0].strip()
+                        port = int(lines[1].strip())
+                        if self.try_connect(host, port):
+                            self.server_host = host
+                            self.server_port = port
+                            return
+            except Exception:
+                pass
         
         # Fall back to manual input
         self.manual_connect()
